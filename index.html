@@ -78,8 +78,8 @@
                  <input id="signup-name" type="text" placeholder="Full Name" class="w-full p-3 rounded-lg input-field mb-4">
                 <input id="signup-email" type="email" placeholder="Email" class="w-full p-3 rounded-lg input-field mb-4">
                 <input id="signup-password" type="password" placeholder="Password" class="w-full p-3 rounded-lg input-field mb-4">
-                <!-- Hidden input for referral code from URL -->
-                <input id="signup-referral" type="hidden" value="">
+                <!-- Referral Code Input -->
+                <input id="signup-referral-code" type="text" placeholder="Referral Code (Optional)" class="w-full p-3 rounded-lg input-field mb-4">
                 <button id="signup-btn" class="w-full p-3 rounded-lg btn-accent mb-4">Sign Up</button>
                 <p class="text-center text-gray-400">Already have an account? <a href="#" id="show-login" class="font-semibold text-accent">Login</a></p>
             </div>
@@ -229,12 +229,17 @@
             <div id="refer-page" class="p-4 space-y-6 sub-page">
                  <h2 class="text-xl font-bold text-center">Refer & Earn</h2>
                  <div class="card-bg p-6 rounded-lg text-center">
+                     <p class="text-gray-400 mb-2">Your Referral Code</p>
+                     <div class="bg-gray-800 p-3 rounded-lg flex items-center justify-center mb-4">
+                         <span id="referral-code" class="text-2xl font-bold tracking-widest">LOADING...</span>
+                         <button id="copy-code-btn" class="ml-4"><i data-lucide="copy" class="w-6 h-6 text-gray-400"></i></button>
+                     </div>
                      <p class="text-gray-400 mb-2">Your Referral Link</p>
                      <div class="bg-gray-800 p-3 rounded-lg flex items-center justify-center mb-4">
                          <span id="referral-link" class="text-sm font-bold tracking-widest break-all">LOADING...</span>
                          <button id="copy-link-btn" class="ml-4"><i data-lucide="copy" class="w-6 h-6 text-gray-400"></i></button>
                      </div>
-                     <p class="text-sm text-gray-300">Share this link with friends to earn 100 coins each!</p>
+                     <p class="text-sm text-gray-300">Share this link/code with friends to earn 100 coins each!</p>
                  </div>
                  <button id="share-btn" class="w-full p-3 rounded-lg btn-accent">Share Your Link</button>
                  
@@ -251,6 +256,13 @@
                             <p class="text-xs text-gray-400">Coins Earned</p>
                         </div>
                     </div>
+                 </div>
+                 
+                 <!-- Apply Referral Code -->
+                 <div class="card-bg p-4 rounded-lg mt-6">
+                    <h3 class="font-semibold mb-3 text-center">Have a Referral Code?</h3>
+                    <input id="enter-referral-code" type="text" placeholder="Enter referral code here" class="w-full p-3 rounded-lg input-field mb-3">
+                    <button id="apply-referral-btn" class="w-full p-3 rounded-lg btn-outline-accent">Apply Code</button>
                  </div>
             </div>
 
@@ -286,6 +298,7 @@
                     <img src="https://placehold.co/100x100/1e1e1e/ff8c00?text=U" class="rounded-full mb-2">
                     <h2 id="profile-name" class="text-xl font-bold">User Name</h2>
                     <p id="profile-email" class="text-gray-400">user@email.com</p>
+                    <p class="text-sm text-gray-500 mt-2">Referred by: <span id="referred-by-info" class="font-semibold">None</span></p>
                 </div>
                 <button id="logout-btn" class="w-full mt-6 p-3 rounded-lg bg-red-600 text-white font-bold">Logout</button>
             </div>
@@ -344,6 +357,7 @@
         const walletBalanceTakaEl = document.getElementById('wallet-balance-taka');
         const profileNameEl = document.getElementById('profile-name');
         const profileEmailEl = document.getElementById('profile-email');
+        const referralCodeEl = document.getElementById('referral-code');
         const referralLinkEl = document.getElementById('referral-link');
         const minBkashEl = document.getElementById('min-bkash');
         const minMobileEl = document.getElementById('min-mobile');
@@ -362,6 +376,7 @@
         const referralEarningsEl = document.getElementById('referral-earnings');
         const userRankEl = document.getElementById('user-rank');
         const userReferralsEl = document.getElementById('user-referrals');
+        const referredByInfoEl = document.getElementById('referred-by-info');
 
         window.onload = () => {
             lucide.createIcons();
@@ -373,7 +388,7 @@
             const urlParams = new URLSearchParams(window.location.search);
             const refCode = urlParams.get('ref');
             if (refCode) {
-                document.getElementById('signup-referral').value = refCode.toUpperCase();
+                document.getElementById('signup-referral-code').value = refCode.toUpperCase();
                 // Show signup view automatically
                 document.getElementById('login-view').classList.add('hidden');
                 document.getElementById('signup-view').classList.remove('hidden');
@@ -578,6 +593,9 @@
             profileNameEl.textContent = userData.name || 'No Name';
             profileEmailEl.textContent = userData.email || 'No Email';
             
+            // Update referral code
+            referralCodeEl.textContent = userData.referralCode || '...';
+            
             // Generate referral link
             const referralLink = window.location.origin + window.location.pathname + '?ref=' + userData.referralCode;
             referralLinkEl.textContent = referralLink;
@@ -585,6 +603,9 @@
             // Update referral stats
             totalReferralsEl.textContent = userData.totalReferrals || 0;
             referralEarningsEl.textContent = userData.referralEarnings || 0;
+            
+            // Update referred by info
+            referredByInfoEl.textContent = userData.referredBy || 'None';
             
             updateDynamicPaymentFields();
             updateAdsLeftCount();
@@ -658,10 +679,12 @@
             });
             
             document.getElementById('notification-bell').addEventListener('click', () => { navigateTo('notifications-page'); });
+            document.getElementById('copy-code-btn').addEventListener('click', copyReferralCode);
             document.getElementById('copy-link-btn').addEventListener('click', copyReferralLink);
             document.getElementById('share-btn').addEventListener('click', shareReferralLink);
             document.getElementById('withdraw-btn').addEventListener('click', handleWithdrawal);
             document.getElementById('home-withdraw-btn').addEventListener('click', () => navigateTo('wallet-page'));
+            document.getElementById('apply-referral-btn').addEventListener('click', handleApplyReferralCode);
             
             // Withdrawal option buttons
             document.querySelectorAll('.withdraw-option-btn').forEach(btn => {
@@ -712,26 +735,33 @@
             const name = document.getElementById('signup-name').value;
             const email = document.getElementById('signup-email').value;
             const password = document.getElementById('signup-password').value;
-            const referralCode = document.getElementById('signup-referral').value;
+            const referralCode = document.getElementById('signup-referral-code').value.trim().toUpperCase();
             
-            if (!name || !email || !password) return showAlert("Please fill all fields.");
+            if (!name || !email || !password) return showAlert("Please fill all required fields.");
             
             loader.style.display = 'flex';
             try {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const userRef = doc(db, "users", userCredential.user.uid);
                 
-                // Set user data with referral code if provided
+                const ownReferralCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                
+                // Set user data
                 const userData = {
                     name: name,
                     email: email,
-                    referralCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
+                    referralCode: ownReferralCode,
                     referredBy: referralCode || null,
                     balance: 50,
                     totalReferrals: 0,
                     referralEarnings: 0,
                     createdAt: serverTimestamp(),
-                    joinDate: new Date().toISOString().split('T')[0]
+                    joinDate: new Date().toISOString().split('T')[0],
+                    lastNotificationCheck: new Date(),
+                    dailyAdCount: 0,
+                    lastAdWatchDate: new Date().toISOString().split('T')[0],
+                    isBlocked: false,
+                    hiddenNotices: []
                 };
                 
                 await setDoc(userRef, userData);
@@ -828,6 +858,18 @@
             }
         }
         
+        async function handleApplyReferralCode() {
+            if (userData.referredBy) return showAlert("You have already used a referral code.");
+            const codeInput = document.getElementById('enter-referral-code');
+            const code = codeInput.value.trim().toUpperCase();
+            if (!code) return showAlert("Please enter a referral code.");
+            if (code === userData.referralCode) return showAlert("You cannot use your own code.");
+            loader.style.display = 'flex';
+            await applyReferralBonus(code, true);
+            codeInput.value = '';
+            loader.style.display = 'none';
+        }
+
         async function applyReferralBonus(referrerCode, isManualApply = false) {
             const usersRef = collection(db, "users");
             const q = query(usersRef, where("referralCode", "==", referrerCode));
@@ -857,7 +899,7 @@
                     userData.referredBy = referrerCode;
                     
                     updateUI();
-                    if(isManualApply) showAlert("Code applied successfully! You received 50 coins.");
+                    if(isManualApply) showAlert("Referral code applied successfully! You received 50 coins.");
                 } else {
                     if(isManualApply) showAlert("Invalid referral code.");
                 }
@@ -929,6 +971,15 @@
             } finally {
                 loader.style.display = 'none';
             }
+        }
+
+        function copyReferralCode() {
+            const textToCopy = referralCodeEl.textContent;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showAlert("Referral code copied!");
+            }).catch(err => {
+                showAlert("Failed to copy code.");
+            });
         }
 
         function copyReferralLink() {
