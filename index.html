@@ -192,10 +192,17 @@
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-300 mb-2">Select Amount & Method</label>
                         <div class="grid grid-cols-2 gap-3">
-                            <button class="withdraw-option-btn p-3 rounded-lg border border-gray-600 text-center" data-amount="100" data-method="bKash/Nagad">
+                            <!-- বিকাশ অপশন -->
+                            <button class="withdraw-option-btn p-3 rounded-lg border border-gray-600 text-center" data-amount="100" data-method="bKash">
                                 <p class="font-bold">100 Taka</p>
-                                <p class="text-xs text-gray-400">bKash/Nagad</p>
+                                <p class="text-xs text-gray-400">bKash</p>
                                 <p class="text-xs mt-1">Min: <span class="text-accent" id="min-bkash">...</span> coins</p>
+                            </button>
+                            <!-- নগদ অপশন -->
+                            <button class="withdraw-option-btn p-3 rounded-lg border border-gray-600 text-center" data-amount="100" data-method="Nagad">
+                                <p class="font-bold">100 Taka</p>
+                                <p class="text-xs text-gray-400">Nagad</p>
+                                <p class="text-xs mt-1">Min: <span class="text-accent" id="min-nagad">...</span> coins</p>
                             </button>
                             <button class="withdraw-option-btn p-3 rounded-lg border border-gray-600 text-center" data-amount="20" data-method="Mobile Recharge">
                                 <p class="font-bold">20 Taka</p>
@@ -213,7 +220,8 @@
                     <input id="withdraw-amount" type="number" placeholder="Or enter custom amount (Taka)" class="w-full p-3 rounded-lg input-field mb-3" min="20">
                     <select id="withdraw-method" class="w-full p-3 rounded-lg input-field mb-3">
                         <option value="">Select Payment Method</option>
-                        <option value="bKash/Nagad">bKash/Nagad (Min: 100 Taka)</option>
+                        <option value="bKash">bKash (Min: 100 Taka)</option>
+                        <option value="Nagad">Nagad (Min: 100 Taka)</option>
                         <option value="Mobile Recharge">Mobile Recharge (Min: 20 Taka)</option>
                     </select>
                     <div id="payment-details-container"></div>
@@ -239,7 +247,7 @@
                          <span id="referral-link" class="text-sm font-bold tracking-widest break-all">LOADING...</span>
                          <button id="copy-link-btn" class="ml-4"><i data-lucide="copy" class="w-6 h-6 text-gray-400"></i></button>
                      </div>
-                     <p class="text-sm text-gray-300">Share this link/code with friends to earn 100 coins each!</p>
+                     <p class="text-sm text-gray-300">Share this link/code with friends to earn 1000 coins each!</p>
                  </div>
                  <button id="share-btn" class="w-full p-3 rounded-lg btn-accent">Share Your Link</button>
                  
@@ -258,12 +266,7 @@
                     </div>
                  </div>
                  
-                 <!-- Apply Referral Code -->
-                 <div class="card-bg p-4 rounded-lg mt-6">
-                    <h3 class="font-semibold mb-3 text-center">Have a Referral Code?</h3>
-                    <input id="enter-referral-code" type="text" placeholder="Enter referral code here" class="w-full p-3 rounded-lg input-field mb-3">
-                    <button id="apply-referral-btn" class="w-full p-3 rounded-lg btn-outline-accent">Apply Code</button>
-                 </div>
+                 <!-- Apply Referral Code Section Removed as per screenshot -->
             </div>
 
             <!-- Leaderboard Page -->
@@ -360,6 +363,7 @@
         const referralCodeEl = document.getElementById('referral-code');
         const referralLinkEl = document.getElementById('referral-link');
         const minBkashEl = document.getElementById('min-bkash');
+        const minNagadEl = document.getElementById('min-nagad');
         const minMobileEl = document.getElementById('min-mobile');
         const withdrawMethodSelect = document.getElementById('withdraw-method');
         const notificationDot = document.getElementById('notification-dot');
@@ -492,8 +496,9 @@
                 const configSnap = await getDoc(configRef);
                 appConfig = configSnap.exists() ? configSnap.data() : { 
                     minWithdrawalBkash: 10000, 
+                    minWithdrawalNagad: 10000, 
                     minWithdrawalMobile: 2000, 
-                    paymentMethods: ["bKash/Nagad", "Mobile Recharge"], 
+                    paymentMethods: ["bKash", "Nagad", "Mobile Recharge"], 
                     dailyAdLimit: 10, 
                     coinValueCoins: 1000, 
                     coinValueInr: 10 
@@ -501,6 +506,7 @@
                 
                 // Update UI with withdrawal minimums
                 minBkashEl.textContent = appConfig.minWithdrawalBkash || 10000;
+                minNagadEl.textContent = appConfig.minWithdrawalNagad || 10000;
                 minMobileEl.textContent = appConfig.minWithdrawalMobile || 2000;
             } catch (error) {
                 console.error("Error fetching app config:", error);
@@ -684,7 +690,6 @@
             document.getElementById('share-btn').addEventListener('click', shareReferralLink);
             document.getElementById('withdraw-btn').addEventListener('click', handleWithdrawal);
             document.getElementById('home-withdraw-btn').addEventListener('click', () => navigateTo('wallet-page'));
-            document.getElementById('apply-referral-btn').addEventListener('click', handleApplyReferralCode);
             
             // Withdrawal option buttons
             document.querySelectorAll('.withdraw-option-btn').forEach(btn => {
@@ -857,18 +862,6 @@
                 historyList.innerHTML = '<p class="text-red-400 text-center">Error loading history.</p>';
             }
         }
-        
-        async function handleApplyReferralCode() {
-            if (userData.referredBy) return showAlert("You have already used a referral code.");
-            const codeInput = document.getElementById('enter-referral-code');
-            const code = codeInput.value.trim().toUpperCase();
-            if (!code) return showAlert("Please enter a referral code.");
-            if (code === userData.referralCode) return showAlert("You cannot use your own code.");
-            loader.style.display = 'flex';
-            await applyReferralBonus(code, true);
-            codeInput.value = '';
-            loader.style.display = 'none';
-        }
 
         async function applyReferralBonus(referrerCode, isManualApply = false) {
             const usersRef = collection(db, "users");
@@ -880,17 +873,17 @@
                     const referrerRef = doc(db, "users", referrerDoc.id);
                     const referrerData = referrerDoc.data();
                     
-                    // Update referrer's stats
+                    // Update referrer's stats - BONUS INCREASED TO 1000 COINS
                     await updateDoc(referrerRef, { 
-                        balance: increment(100),
+                        balance: increment(1000), // Changed from 100 to 1000
                         totalReferrals: increment(1),
-                        referralEarnings: increment(100)
+                        referralEarnings: increment(1000) // Changed from 100 to 1000
                     });
                     
                     // Update current user
                     const newUserRef = doc(db, "users", currentUser.uid);
                     await updateDoc(newUserRef, { 
-                        balance: increment(50), // Bonus for new user
+                        balance: increment(50), // Bonus for new user remains 50
                         referredBy: referrerCode 
                     });
                     
@@ -931,9 +924,12 @@
             
             // Set minimum withdrawal based on method
             let minCoins;
-            if (method === 'bKash/Nagad') {
+            if (method === 'bKash') {
                 minCoins = appConfig.minWithdrawalBkash || 10000;
-                if (amount < 100) return showAlert("Minimum withdrawal for bKash/Nagad is 100 Taka.");
+                if (amount < 100) return showAlert("Minimum withdrawal for bKash is 100 Taka.");
+            } else if (method === 'Nagad') {
+                minCoins = appConfig.minWithdrawalNagad || 10000;
+                if (amount < 100) return showAlert("Minimum withdrawal for Nagad is 100 Taka.");
             } else if (method === 'Mobile Recharge') {
                 minCoins = appConfig.minWithdrawalMobile || 2000;
                 if (amount < 20) return showAlert("Minimum withdrawal for Mobile Recharge is 20 Taka.");
