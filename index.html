@@ -382,6 +382,31 @@
         const userReferralsEl = document.getElementById('user-referrals');
         const referredByInfoEl = document.getElementById('referred-by-info');
 
+        // Generate or retrieve device ID
+        function getDeviceId() {
+            let deviceId = localStorage.getItem('deviceId');
+            if (!deviceId) {
+                // Create a unique device ID
+                deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('deviceId', deviceId);
+            }
+            return deviceId;
+        }
+
+        // Check if device already has an account
+        async function checkDeviceHasAccount() {
+            const deviceId = getDeviceId();
+            const usersRef = collection(db, "users");
+            const q = query(usersRef, where("deviceId", "==", deviceId));
+            try {
+                const querySnapshot = await getDocs(q);
+                return !querySnapshot.empty;
+            } catch (error) {
+                console.error("Error checking device:", error);
+                return false;
+            }
+        }
+
         window.onload = () => {
             lucide.createIcons();
             setupEventListeners();
@@ -466,7 +491,8 @@
                         hiddenNotices: [],
                         totalReferrals: 0,
                         referralEarnings: 0,
-                        joinDate: new Date().toISOString().split('T')[0]
+                        joinDate: new Date().toISOString().split('T')[0],
+                        deviceId: getDeviceId() // Store device ID
                     };
                     
                     // Check for referral from URL during signup
@@ -744,6 +770,12 @@
             
             if (!name || !email || !password) return showAlert("Please fill all required fields.");
             
+            // Check if device already has an account
+            const deviceHasAccount = await checkDeviceHasAccount();
+            if (deviceHasAccount) {
+                return showAlert("This device already has an account. You can only create one account per device.");
+            }
+            
             loader.style.display = 'flex';
             try {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -766,7 +798,8 @@
                     dailyAdCount: 0,
                     lastAdWatchDate: new Date().toISOString().split('T')[0],
                     isBlocked: false,
-                    hiddenNotices: []
+                    hiddenNotices: [],
+                    deviceId: getDeviceId() // Store device ID
                 };
                 
                 await setDoc(userRef, userData);
@@ -787,9 +820,38 @@
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
             if (!email || !password) return showAlert("Please enter email and password.");
+            
             loader.style.display = 'flex';
             try {
-                await signInWithEmailAndPassword(auth, email, password);
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                
+                // After successful login, check if this account belongs to this device
+                const userRef = doc(db, "users", userCredential.user.uid);
+                const userSnap = await getDoc(userRef);
+                
+                if (userSnap.exists()) {
+                    const userData = userSnap.data();
+                    const deviceId = getDeviceId();
+                    
+                    // If user doesn't have a deviceId (old account), assign current device
+                    if (!userData.deviceId) {
+                        await updateDoc(userRef, { deviceId: deviceId });
+                    } 
+                    // If user has a different deviceId, check if it's blocked
+                    else if (userData.deviceId !== deviceId) {
+                        // Check if the device already has another account
+                        const deviceHasAccount = await checkDeviceHasAccount();
+                        if (deviceHasAccount) {
+                            await signOut(auth);
+                            showAlert("This device already has another account. You can only have one account per device.");
+                            return;
+                        }
+                        
+                        // Update to new device (allow login but update device)
+                        await updateDoc(userRef, { deviceId: deviceId });
+                    }
+                }
+                
             } catch (error) {
                 showAlert(error.message);
             } finally {
